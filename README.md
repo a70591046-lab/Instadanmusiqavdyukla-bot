@@ -11,6 +11,11 @@ Ushbu bot Instagram, TikTok, YouTube tarmoqlaridan media yuklash, musiqalarni qi
    - Yoki `/dumaloq <havola>` yuborilsa
    - Yoki video yuborilgandagi tugma bosilsa, FFmpeg orqali 1:1 formatdagi Telegram Video Note yaratiladi.
 
+## 24/7 Bulutli Serverga (Render) Yuklash
+Quyidagi tugmani bir marta bosish orqali botni 24/7 ishlaydigan bepul serverga qo'yishingiz mumkin:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/a70591046-lab/Instadanmusiqavdyukla-bot)
+
 ## O'rnatish va Ishga tushirish
 1. Kutubxonalarni o'rnatish:
    ```bash
