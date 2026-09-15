@@ -64,7 +64,15 @@ async def cb_download_music(callback: types.CallbackQuery):
     track_info = SEARCH_CACHE.get(track_key)
 
     if not track_info:
-        await callback.answer("Musiqa ma'lumotlari eskirgan. Qaytadan qidiring.", show_alert=True)
+        try:
+            track_info = await DownloaderService.get_deezer_track(track_key)
+            if track_info:
+                SEARCH_CACHE[track_key] = track_info
+        except Exception:
+            pass
+
+    if not track_info:
+        await callback.answer("Musiqa ma'lumotlari topilmadi. Qaytadan qidiring.", show_alert=True)
         return
 
     preview_url = track_info.get("preview")

@@ -274,6 +274,31 @@ class DownloaderService:
             return []
 
     @classmethod
+    async def get_deezer_track(cls, track_id: str) -> Optional[Dict[str, Any]]:
+        """Deezer track ID orqali musiqa ma'lumotlarini olish"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                url = f"https://api.deezer.com/track/{track_id}"
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status != 200:
+                        return None
+                    item = await resp.json()
+                    if "error" in item:
+                        return None
+                    return {
+                        "id": item.get("id"),
+                        "title": item.get("title"),
+                        "artist": item.get("artist", {}).get("name", "Noma'lum"),
+                        "duration": item.get("duration", 0),
+                        "preview": item.get("preview"),
+                        "link": item.get("link"),
+                        "cover": item.get("album", {}).get("cover_medium")
+                    }
+        except Exception as e:
+            print(f"Deezer get_track xatosi: {e}")
+            return None
+
+    @classmethod
     async def download_full_audio(cls, artist: str, title: str) -> Path:
         """To'liq qo'shiqni (full track MP3) YouTube yoki SoundCloud orqali yuklab olish"""
         def _download():
@@ -298,17 +323,19 @@ class DownloaderService:
             if PROXY:
                 ydl_opts["proxy"] = PROXY
 
+            clean_artist = "" if artist in ["Noma'lum", "Unknown", None] else artist.strip()
+            clean_title = title.strip()
+            clean_query = f"{clean_artist} {clean_title}".strip()
+
             queries = [
-                f"ytsearch1:{artist} {title}",
-                f"ytsearch1:{artist} {title} audio",
-                f"scsearch1:{artist} {title}"
+                f"scsearch1:{clean_query}",
+                f"ytsearch1:{clean_query} audio",
+                f"ytsearch1:{clean_query}"
             ]
 
             for q in queries:
                 try:
                     opts = dict(ydl_opts)
-                    if "ytsearch" in q:
-                        opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
                     with yt_dlp.YoutubeDL(opts) as ydl:
                         info = ydl.extract_info(q, download=True)
                         if info:
