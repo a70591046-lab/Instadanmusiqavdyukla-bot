@@ -79,7 +79,14 @@ async def cb_download_music(callback: types.CallbackQuery):
     try:
         import html
         from aiogram.enums import ParseMode
-        audio_path = await DownloaderService.download_preview_audio(preview_url, track_info['title'])
+
+        # 1. Avval YouTube orqali to'liq musiqani (Full MP3) yuklash
+        try:
+            audio_path = await DownloaderService.download_full_audio(track_info['artist'], track_info['title'])
+        except Exception:
+            # 2. Agar to'liq yuklab bo'lmasa, preview dan foydalanish
+            audio_path = await DownloaderService.download_preview_audio(preview_url, track_info['title'])
+
         safe_artist = html.escape(track_info.get('artist', ''))
         safe_title = html.escape(track_info.get('title', ''))
         await callback.message.reply_audio(
@@ -90,6 +97,7 @@ async def cb_download_music(callback: types.CallbackQuery):
             parse_mode=ParseMode.HTML
         )
         await status.delete()
+
     except Exception as e:
         await status.edit_text(f"❌ Musiqani yuklashda xatolik: {e}")
     finally:

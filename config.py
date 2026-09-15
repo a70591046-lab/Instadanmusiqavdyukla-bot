@@ -14,5 +14,8 @@ if not BOT_TOKEN:
 DOWNLOADS_DIR = BASE_DIR / "downloads"
 DOWNLOADS_DIR.mkdir(exist_ok=True, parents=True)
 
-# ByeDPI / Proxy sozlamasi (bo'sh qoldirilsa lokal ByeDPI 10808 ishlatiladi)
-PROXY = os.getenv("PROXY", "socks5://127.0.0.1:10808").strip()
+import sys
+# ByeDPI / Proxy sozlamasi: Windowsda lokal ByeDPI, Linux/Serverda esa to'g'ridan-to'g'ri (None)
+PROXY = os.getenv("PROXY", "").strip() or None
+if not PROXY and sys.platform == "win32":
+    PROXY = "socks5://127.0.0.1:10808"

@@ -274,8 +274,49 @@ class DownloaderService:
             return []
 
     @classmethod
+    async def download_full_audio(cls, artist: str, title: str) -> Path:
+        """To'liq qo'shiqni (full track MP3) YouTube orqali qidirib yuklab olish"""
+        def _download():
+            query = f"{artist} - {title} audio"
+            file_id = uuid.uuid4().hex[:8]
+            out_template = str(DOWNLOADS_DIR / f"full_{file_id}.%(ext)s")
+
+            ydl_opts: Dict[str, Any] = {
+                "outtmpl": out_template,
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "format": "bestaudio/best",
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }],
+                "max_filesize": 45 * 1024 * 1024,
+                "socket_timeout": 30,
+            }
+
+            if PROXY:
+                ydl_opts["proxy"] = PROXY
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info(f"ytsearch1:{query}", download=True)
+
+            expected_file = DOWNLOADS_DIR / f"full_{file_id}.mp3"
+            if expected_file.exists():
+                return expected_file
+
+            for f in DOWNLOADS_DIR.glob(f"full_{file_id}.*"):
+                if f.is_file() and f.stat().st_size > 0:
+                    return f
+
+            raise RuntimeError("To'liq musiqa fayli topilmadi.")
+
+        return await asyncio.to_thread(_download)
+
+    @classmethod
     async def download_preview_audio(cls, preview_url: str, title: str) -> Path:
-        """Deezer audiosini yuklab berish"""
+        """Deezer audiosini yuklab berish (fallback)"""
         file_id = uuid.uuid4().hex[:8]
         audio_path = DOWNLOADS_DIR / f"music_{file_id}.mp3"
         async with aiohttp.ClientSession() as session:
@@ -285,3 +326,4 @@ class DownloaderService:
                         f.write(await resp.read())
                     return audio_path
         raise RuntimeError("Musiqani yuklab bo'lmadi.")
+
