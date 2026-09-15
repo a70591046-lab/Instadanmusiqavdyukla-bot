@@ -275,9 +275,8 @@ class DownloaderService:
 
     @classmethod
     async def download_full_audio(cls, artist: str, title: str) -> Path:
-        """To'liq qo'shiqni (full track MP3) YouTube orqali qidirib yuklab olish"""
+        """To'liq qo'shiqni (full track MP3) YouTube yoki SoundCloud orqali yuklab olish"""
         def _download():
-            query = f"{artist} - {title} audio"
             file_id = uuid.uuid4().hex[:8]
             out_template = str(DOWNLOADS_DIR / f"full_{file_id}.%(ext)s")
 
@@ -293,26 +292,40 @@ class DownloaderService:
                     "preferredquality": "192",
                 }],
                 "max_filesize": 45 * 1024 * 1024,
-                "socket_timeout": 30,
+                "socket_timeout": 25,
             }
 
             if PROXY:
                 ydl_opts["proxy"] = PROXY
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.extract_info(f"ytsearch1:{query}", download=True)
+            queries = [
+                f"ytsearch1:{artist} {title}",
+                f"ytsearch1:{artist} {title} audio",
+                f"scsearch1:{artist} {title}"
+            ]
 
-            expected_file = DOWNLOADS_DIR / f"full_{file_id}.mp3"
-            if expected_file.exists():
-                return expected_file
+            for q in queries:
+                try:
+                    opts = dict(ydl_opts)
+                    if "ytsearch" in q:
+                        opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        info = ydl.extract_info(q, download=True)
+                        if info:
+                            expected_file = DOWNLOADS_DIR / f"full_{file_id}.mp3"
+                            if expected_file.exists() and expected_file.stat().st_size > 200 * 1024:
+                                return expected_file
+                            for f in DOWNLOADS_DIR.glob(f"full_{file_id}.*"):
+                                if f.is_file() and f.stat().st_size > 200 * 1024:
+                                    return f
+                except Exception as e:
+                    print(f"Qidiruv xatosi ({q}): {e}")
+                    continue
 
-            for f in DOWNLOADS_DIR.glob(f"full_{file_id}.*"):
-                if f.is_file() and f.stat().st_size > 0:
-                    return f
-
-            raise RuntimeError("To'liq musiqa fayli topilmadi.")
+            raise RuntimeError("To'liq musiqa topilmadi.")
 
         return await asyncio.to_thread(_download)
+
 
     @classmethod
     async def download_preview_audio(cls, preview_url: str, title: str) -> Path:

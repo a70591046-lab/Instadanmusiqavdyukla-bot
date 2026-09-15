@@ -73,30 +73,35 @@ async def cb_download_music(callback: types.CallbackQuery):
         return
 
     await callback.answer("Musiqa yuklanmoqda...")
-    status = await callback.message.reply(f"⏳ \"{track_info['title']}\" yuklanmoqda...")
+    status = await callback.message.reply(f"⏳ \"{track_info['title']}\" to'liq formatda yuklanmoqda...")
 
     audio_path = None
+    is_full = False
     try:
         import html
         from aiogram.enums import ParseMode
 
-        # 1. Avval YouTube orqali to'liq musiqani (Full MP3) yuklash
+        # 1. Avval YouTube yoki SoundCloud orqali to'liq musiqani (Full MP3) yuklash
         try:
             audio_path = await DownloaderService.download_full_audio(track_info['artist'], track_info['title'])
-        except Exception:
+            is_full = True
+        except Exception as err:
+            print(f"To'liq yuklash o'xshamadi, preview olinmoqda: {err}")
             # 2. Agar to'liq yuklab bo'lmasa, preview dan foydalanish
             audio_path = await DownloaderService.download_preview_audio(preview_url, track_info['title'])
 
         safe_artist = html.escape(track_info.get('artist', ''))
         safe_title = html.escape(track_info.get('title', ''))
+        tag = " (To'liq versiya 🎧)" if is_full else " (Qisqa parcha)"
         await callback.message.reply_audio(
             audio=FSInputFile(audio_path),
             title=track_info['title'],
             performer=track_info['artist'],
-            caption=f"🎵 <b>{safe_artist} — {safe_title}</b>\n\n🤖 @Instadanmusiqavdyukla_bot",
+            caption=f"🎵 <b>{safe_artist} — {safe_title}</b>{tag}\n\n🤖 @Instadanmusiqavdyukla_bot",
             parse_mode=ParseMode.HTML
         )
         await status.delete()
+
 
     except Exception as e:
         await status.edit_text(f"❌ Musiqani yuklashda xatolik: {e}")
