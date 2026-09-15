@@ -248,30 +248,94 @@ class DownloaderService:
         return audio_path
 
     @classmethod
-    async def search_music_deezer(cls, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """Deezer orqali musiqalarni qidirish"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                url = f"https://api.deezer.com/search?q={query}&limit={limit}"
-                async with session.get(url, timeout=10) as resp:
-                    if resp.status != 200:
-                        return []
-                    data = await resp.json()
-                    results = []
-                    for item in data.get("data", []):
+    async def search_music_youtube(cls, query: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """YouTube orqali musiqa qidirish (tez, faqat metadata, yuklamaydi)"""
+        def _search():
+            ydl_opts: Dict[str, Any] = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+                "skip_download": True,
+                "noplaylist": True,
+            }
+            if PROXY:
+                ydl_opts["proxy"] = PROXY
+
+            results = []
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+                    if not info or "entries" not in info:
+                        return results
+                    for entry in info["entries"]:
+                        if not entry:
+                            continue
+                        video_id = entry.get("id", "")
+                        if not video_id:
+                            continue
+                        title = entry.get("title", "Noma'lum")
+                        duration = entry.get("duration") or 0
+                        uploader = entry.get("uploader") or entry.get("channel") or ""
+                        # "Artist - Title" shaklida bo'lsa ajratamiz
+                        artist = ""
+                        clean_title = title
+                        if " - " in title:
+                            parts = title.split(" - ", 1)
+                            artist = parts[0].strip()
+                            clean_title = parts[1].strip()
+                        elif uploader:
+                            artist = uploader.replace(" - Topic", "").strip()
                         results.append({
-                            "id": item.get("id"),
-                            "title": item.get("title"),
-                            "artist": item.get("artist", {}).get("name", "Noma'lum"),
-                            "duration": item.get("duration", 0),
-                            "preview": item.get("preview"),
-                            "link": item.get("link"),
-                            "cover": item.get("album", {}).get("cover_medium")
+                            "id": video_id,
+                            "url": f"https://www.youtube.com/watch?v={video_id}",
+                            "title": clean_title,
+                            "artist": artist,
+                            "duration": int(duration),
                         })
-                    return results
-        except Exception as e:
-            print(f"Deezer qidiruv xatosi: {e}")
-            return []
+            except Exception as e:
+                print(f"YouTube qidiruv xatosi: {e}")
+            return results
+
+        return await asyncio.to_thread(_search)
+
+    @classmethod
+    async def download_audio_by_url(cls, url: str) -> Path:
+        """YouTube URL dan to'liq audio (MP3) yuklash"""
+        def _download():
+            file_id = uuid.uuid4().hex[:8]
+            out_template = str(DOWNLOADS_DIR / f"track_{file_id}.%(ext)s")
+
+            ydl_opts: Dict[str, Any] = {
+                "outtmpl": out_template,
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "format": "bestaudio/best",
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }],
+                "max_filesize": 45 * 1024 * 1024,
+                "socket_timeout": 30,
+            }
+            if PROXY:
+                ydl_opts["proxy"] = PROXY
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info(url, download=True)
+
+            # MP3 faylini topish
+            mp3_file = DOWNLOADS_DIR / f"track_{file_id}.mp3"
+            if mp3_file.exists() and mp3_file.stat().st_size > 50 * 1024:
+                return mp3_file
+            for f in DOWNLOADS_DIR.glob(f"track_{file_id}.*"):
+                if f.is_file() and f.stat().st_size > 50 * 1024:
+                    return f
+            raise RuntimeError("Audio fayl topilmadi yoki juda kichik.")
+
+        return await asyncio.to_thread(_download)
+
 
     @classmethod
     async def get_deezer_track(cls, track_id: str) -> Optional[Dict[str, Any]]:
