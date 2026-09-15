@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: instadanmusiqavdyukla-bot
+    runtime: docker
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: BOT_TOKEN
+        value: 8943375095:AAGaVjn9m8f2wotptfTJieQualhMeztdLbA
+      - key: ADMIN_ID
+        value: Muhammadali00010
